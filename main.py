@@ -33,25 +33,16 @@ while True:
     dx = goal[0] - x
     dy = goal[1] - y
     distance = math.sqrt(dx*dx + dy*dy)
-    target_angle = math.atan2(dy, dx)
+    target_angle = -math.atan2(dy, dx)
     angle_error = target_angle - yaw
-    angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
 
     if distance < 1:  # close enough
         left_vel = right_vel = 0
     elif abs(angle_error) > 0.2:  # turn towards goal
-        left_vel = -velocity if angle_error > 0 else velocity
-        right_vel = velocity if angle_error > 0 else -velocity
+        left_vel = velocity if angle_error > 0 else -velocity
+        right_vel = -velocity if angle_error > 0 else velocity
     else:  # go straight
-        left_vel = right_vel = velocity
-
-    #debug
-    line_length = 2
-    start = [x, y, z]
-    end = [x + line_length * math.cos(yaw),
-           y + line_length * math.sin(yaw),
-           z]
-    p.addUserDebugLine(start, end, [0, 1, 0], 2, lifeTime=0.1)
+        left_vel = right_vel = -velocity
 
     # 2 right_front_wheel_joint
     # 6 left_front_wheel_joint
