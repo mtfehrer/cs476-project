@@ -6,8 +6,8 @@ import pybullet_data
 SQUARE_SIZE = 2.0
 ROBOT_START_POS = (1, 1)
 
-FORCE = 150
-VELOCITY = 15
+FORCE = 100
+VELOCITY = 50
 DISTANCE_THRESHOLD = 0.8
 
 # W = WAREHOUSE, . = FLOOR, B = BLOCKED
@@ -103,7 +103,6 @@ def main():
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(0, 0, -10)
-    p.setRealTimeSimulation(0)
 
     p.loadURDF("plane.urdf")
     
@@ -122,7 +121,7 @@ def main():
 
     try:
         while True:
-            ui_text_ids = update_ui(orders, ui_text_ids)
+            #ui_text_ids = update_ui(orders, ui_text_ids)
 
             for robot in robots:
                 if robot['state'] == 'idle':
@@ -172,15 +171,14 @@ def main():
                                 robot['state'] = 'idle'
                     else:
                         # Navigation logic
-                        target_angle = math.atan2(dy, dx)
-                        angle_error = math.atan2(math.sin(target_angle - yaw), math.cos(target_angle - yaw))
+                        target_angle = -math.atan2(dy, dx)
+                        angle_error = target_angle - yaw
                         
                         if abs(angle_error) > 0.2:
-                            turn_speed = max(5, min(VELOCITY, VELOCITY * abs(angle_error)))
-                            left_vel = -turn_speed if angle_error > 0 else turn_speed
-                            right_vel = turn_speed if angle_error > 0 else -turn_speed
+                            left_vel = VELOCITY if angle_error > 0 else -VELOCITY
+                            right_vel = -VELOCITY if angle_error > 0 else VELOCITY
                         else:
-                            left_vel = right_vel = VELOCITY
+                            left_vel = right_vel = -VELOCITY * 2
                     
                         p.setJointMotorControl2(robot['robotId'], 2, p.VELOCITY_CONTROL, targetVelocity=right_vel, force=FORCE)
                         p.setJointMotorControl2(robot['robotId'], 6, p.VELOCITY_CONTROL, targetVelocity=left_vel, force=FORCE)
