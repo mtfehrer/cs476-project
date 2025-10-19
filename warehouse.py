@@ -63,8 +63,12 @@ def find_warehouse_for_item(item_name, warehouses):
             return wh_pos
     return None
 
-def update_ui(orders, ui_text_ids):
+def update_ui(orders, ui_text_ids, last_ui_state):
     """Draws and updates the UI panel with order information."""
+    current_state = [(o['id'], o['status'], tuple(o['items_needed']), o['robot_id']) for o in orders]
+    if current_state == last_ui_state:
+        return ui_text_ids, last_ui_state  # No change → no redraw
+
     for item_id in ui_text_ids:
         p.removeUserDebugItem(item_id)
     ui_text_ids.clear()
@@ -84,7 +88,7 @@ def update_ui(orders, ui_text_ids):
         text_id = p.addUserDebugText(text, text_pos, textColorRGB=[1,1,1], textSize=1.2)
         ui_text_ids.append(text_id)
         
-    return ui_text_ids
+    return ui_text_ids, current_state
 
 def set_robot_target(robot, item_name, warehouses):
     target_grid_pos = find_warehouse_for_item(item_name, warehouses)
@@ -118,10 +122,11 @@ def main():
     robots = [{"id": 0, "robotId": robotId, "state": "idle", "order_id": None, "target_pos": None}]
 
     ui_text_ids = []
+    last_ui_state = None
 
     try:
         while True:
-            #ui_text_ids = update_ui(orders, ui_text_ids)
+            ui_text_ids, last_ui_state = update_ui(orders, ui_text_ids, last_ui_state)
 
             for robot in robots:
                 if robot['state'] == 'idle':
@@ -184,7 +189,7 @@ def main():
                         p.setJointMotorControl2(robot['robotId'], 6, p.VELOCITY_CONTROL, targetVelocity=left_vel, force=FORCE)
 
             p.stepSimulation()
-            time.sleep(1 / 240)
+            time.sleep(1 / 1000)
 
     except p.error as e:
         print(f"PyBullet error: {e}")
