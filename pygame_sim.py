@@ -1,4 +1,5 @@
-import pygame, sys, time
+import pygame, sys
+from utils import a_star
 
 screen_size = (1200, 900)
 screen = pygame.display.set_mode(screen_size)
@@ -20,9 +21,10 @@ shelf_img = pygame.transform.scale(shelf_img, (150, 200))
 
 grid_size = 175
 
-robot_position = (1, 0)
-remaining_path = [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 4)]
-frames = 0
+robot_pos = (1, 0)
+goal_pos = (3, 4)
+remaining_path = a_star(map_, robot_pos, goal_pos)
+move_timer = 0
 
 def render_map():
 	for i in range(len(map_)):
@@ -39,14 +41,14 @@ while True:
 			pygame.quit()
 			sys.exit()
 
-	frames += 1
-	if frames == framerate:
-		map_[robot_position[0]][robot_position[1]] = 0
+	move_timer += 1
+	if move_timer == framerate:
+		map_[robot_pos[0]][robot_pos[1]] = 0
 		if remaining_path:
-			robot_position = remaining_path[0]
+			robot_pos = remaining_path[0]
 			remaining_path = remaining_path[1:]
-		map_[robot_position[0]][robot_position[1]] = 2
-		frames = 0
+		map_[robot_pos[0]][robot_pos[1]] = 2
+		move_timer = 0
 
 	screen.fill((0, 0, 0))
 	render_map()
