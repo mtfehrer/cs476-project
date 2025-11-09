@@ -1,54 +1,59 @@
-import time
-import math
-import pybullet as p
-import pybullet_data
+import pygame
+import sys
+from warehouse import Warehouse
+from order import Order
 
-physicsClient = p.connect(p.GUI)
-p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-p.setAdditionalSearchPath(pybullet_data.getDataPath())
-p.setGravity(0, 0, -10)
+pygame.init()
+screen_size = (1200, 900)
+screen = pygame.display.set_mode(screen_size)
+clock = pygame.time.Clock()
+framerate = 144
 
-planeId = p.loadURDF("plane.urdf")
-robotId = p.loadURDF("r2d2.urdf", [0, 0, 0.5], p.getQuaternionFromEuler([0,0,0]))
+robot_img = pygame.image.load("robot.png").convert_alpha()
+robot_img = pygame.transform.scale(robot_img, (150, 200))
+shelf_img = pygame.image.load("shelf.png").convert_alpha()
+shelf_img = pygame.transform.scale(shelf_img, (150, 200))
 
-goal = (5, 6)
-force = 100
-velocity = 50
+grid_size = 175
 
-#place goal marker
-visualShapeId = p.createVisualShape(shapeType=p.GEOM_BOX, halfExtents=[0.5, 0.5, 0.5], rgbaColor=[1, 0, 0, 1])
-collisionShapeId = p.createCollisionShape(shapeType=p.GEOM_BOX, halfExtents=[0.5, 0.5, 0.5])
-p.createMultiBody(
-    baseMass=1,
-    baseVisualShapeIndex=visualShapeId,
-    baseCollisionShapeIndex=collisionShapeId,
-    basePosition=[goal[0], goal[1], 2],
-)
+map_layout = [
+    [1, 0, 1, 0, 1],
+    [0, 0, 0, 0, 0],
+    [1, 0, 1, 0, 1],
+    [0, 0, 0, 0, 0],
+    [1, 0, 1, 0, 1]
+]
 
+warehouse = Warehouse(map_layout)
+
+warehouse.shelves[(0, 0)].add_item("Widget", 50)
+warehouse.shelves[(0, 2)].add_item("Gadget", 30)
+warehouse.shelves[(2, 0)].add_item("Sprocket", 20)
+
+robot1 = warehouse.add_robot((1, 0))
+robot2 = warehouse.add_robot((3, 0))
+
+order1 = Order(warehouse.shelves[(0, 0)], "Widget", 5, is_pickup=True)
+order2 = Order(warehouse.shelves[(0, 2)], "Gadget", 3, is_pickup=True)
+
+robot1.execute_order(order1)
+robot2.execute_order(order2)
+
+frames = 0
 while True:
-    pos, orn = p.getBasePositionAndOrientation(robotId)
-    x, y, z = pos
-    yaw = p.getEulerFromQuaternion(orn)[2]
-
-    dx = goal[0] - x
-    dy = goal[1] - y
-    distance = math.sqrt(dx*dx + dy*dy)
-    target_angle = -math.atan2(dy, dx)
-    angle_error = target_angle - yaw
-
-    if distance < 1:  # close enough
-        left_vel = right_vel = 0
-    elif abs(angle_error) > 0.2:  # turn towards goal
-        left_vel = velocity if angle_error > 0 else -velocity
-        right_vel = -velocity if angle_error > 0 else velocity
-    else:  # go straight
-        left_vel = right_vel = -velocity
-
-    # 2 right_front_wheel_joint
-    # 6 left_front_wheel_joint
-    p.setJointMotorControl2(robotId, 2, p.VELOCITY_CONTROL, targetVelocity=right_vel, force=force)
-    p.setJointMotorControl2(robotId, 6, p.VELOCITY_CONTROL, targetVelocity=left_vel, force=force)
-    p.stepSimulation()
-    time.sleep(1 / 240)
-
-p.disconnect()
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+    
+    frames += 1
+    should_move = (frames >= framerate)
+    if should_move:
+        frames = 0
+    
+    warehouse.update(should_move)
+    
+    screen.fill((0, 0, 0))
+    warehouse.render(screen, shelf_img, robot_img, grid_size)
+    pygame.display.update()
+    clock.tick(framerate)
