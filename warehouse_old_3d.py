@@ -189,7 +189,7 @@ def main():
                         p.setJointMotorControl2(robot['robotId'], 6, p.VELOCITY_CONTROL, targetVelocity=left_vel, force=FORCE)
 
             p.stepSimulation()
-            time.sleep(1 / 1000)
+            time.sleep(1 / 10000)
 
     except p.error as e:
         print(f"PyBullet error: {e}")

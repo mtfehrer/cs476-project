@@ -290,6 +290,6 @@ print("Pick and place demo done. You can explore the scene now.")
 
 while p.isConnected():
     p.stepSimulation()
-    time.sleep(1.0 / 240.0)
+    time.sleep(1.0 / 2400.0)
 
 p.disconnect()
