@@ -1,0 +1,3 @@
+- Update text rendering so text of multiple items don't overlap
+- Move all constants to constants file for simplicity
+- Sort warehouse and create orders for robots to move the items to the correct locations
