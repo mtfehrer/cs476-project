@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple
 from shelf import Shelf
 from robot import Robot
+from constants import font, item_colors, text_surfaces
 
 class Warehouse:
     def __init__(self, map_layout: List[List[int]]):
@@ -37,7 +38,13 @@ class Warehouse:
     
     def render(self, screen, shelf_img, robot_img, grid_size):
         for pos, shelf in self.shelves.items():
-            screen.blit(shelf_img, (pos[1] * grid_size, pos[0] * grid_size))
-        
+            shelf_pos = (pos[1] * grid_size, pos[0] * grid_size)
+            screen.blit(shelf_img, shelf_pos)
+
+            for item, q in shelf.items.items():
+                if (item, q) not in text_surfaces:
+                    text_surfaces[(item, q)] = font.render(f"{item}: {q}", True, item_colors[item])
+                screen.blit(text_surfaces[(item, q)], shelf_pos)
+
         for robot in self.robots:
             screen.blit(robot_img, (robot.position[1] * grid_size, robot.position[0] * grid_size))

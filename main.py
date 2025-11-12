@@ -3,7 +3,6 @@ import sys
 from warehouse import Warehouse
 from order import Order
 
-pygame.init()
 screen_size = (1200, 900)
 screen = pygame.display.set_mode(screen_size)
 clock = pygame.time.Clock()
