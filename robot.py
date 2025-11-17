@@ -9,7 +9,7 @@ class Robot:
         self.robot_id = robot_id
         self.warehouse = warehouse
         self.path: List[Tuple[int, int]] = []
-        self.current_order: Optional[Order] = None
+        self.current_order: Optional[Task] = None
         self.inventory: Dict[str, int] = {}
         self.state = "idle"
     
@@ -68,7 +68,7 @@ class Robot:
         path.reverse()
         return path
     
-    def execute_order(self, order: Order):
+    def execute_order(self, order: Task):
         self.current_order = order
         self.goto(order.shelf.position)
     

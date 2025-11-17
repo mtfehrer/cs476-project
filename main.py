@@ -32,8 +32,8 @@ warehouse.shelves[(2, 0)].add_item("Sprocket", 20)
 robot1 = warehouse.add_robot((1, 0))
 robot2 = warehouse.add_robot((3, 0))
 
-order1 = Order(warehouse.shelves[(0, 0)], "Widget", 5, is_pickup=True)
-order2 = Order(warehouse.shelves[(0, 2)], "Gadget", 3, is_pickup=True)
+order1 = Task(warehouse.shelves[(0, 0)], "Widget", 5, is_pickup=True)
+order2 = Task(warehouse.shelves[(0, 2)], "Gadget", 3, is_pickup=True)
 
 robot1.execute_order(order1)
 robot2.execute_order(order2)
