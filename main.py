@@ -53,15 +53,14 @@ while True:
 	if should_add_item:
 		random_shelf = warehouse.get_random_shelf()
 		item, amount = warehouse_importer.add_random_item(random_shelf)
-		task_queue = task_queue + get_tasks_for_item_sort(warehouse, robot1, item, amount, random_shelf.position)
+		task_queue = task_queue + get_tasks_for_item_sort(warehouse, item, amount, random_shelf.position)
 		add_items_timer = 0
 
 	if robot1.state == "idle" and task_queue:
 		cur_task = task_queue.pop(0)
 		robot1.execute_order(cur_task)
-	
+
 	warehouse.update(should_move)
-	print(robot1.state)
 	
 	screen.fill((0, 0, 0))
 	warehouse.render(screen, shelf_img, robot_img, grid_size)
