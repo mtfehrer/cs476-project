@@ -3,6 +3,7 @@ import sys
 from warehouse import Warehouse
 from task import Task
 from importer import Importer
+from utils import *
 
 screen_size = (1200, 900)
 screen = pygame.display.set_mode(screen_size)
@@ -29,18 +30,9 @@ map_layout = [
 
 warehouse = Warehouse(map_layout)
 
-warehouse.shelves[(0, 0)].add_item("Widget", 50)
-warehouse.shelves[(0, 2)].add_item("Gadget", 30)
-warehouse.shelves[(2, 0)].add_item("Sprocket", 20)
-
 robot1 = warehouse.add_robot((1, 0))
-robot2 = warehouse.add_robot((3, 0))
 
-order1 = Task(warehouse.shelves[(0, 0)], "Widget", 5, is_pickup=True)
-order2 = Task(warehouse.shelves[(0, 2)], "Gadget", 3, is_pickup=True)
-
-robot1.execute_order(order1)
-robot2.execute_order(order2)
+task_queue = []
 
 frames = 0
 add_items_timer = 0
@@ -60,11 +52,16 @@ while True:
 	should_add_item = (add_items_timer >= items_timer)
 	if should_add_item:
 		random_shelf = warehouse.get_random_shelf()
-		warehouse_importer.add_random_item(random_shelf)
+		item, amount = warehouse_importer.add_random_item(random_shelf)
+		task_queue = task_queue + get_tasks_for_item_sort(warehouse, robot1, item, amount, random_shelf.position)
 		add_items_timer = 0
-	
+
+	if robot1.state == "idle" and task_queue:
+		cur_task = task_queue.pop(0)
+		robot1.execute_order(cur_task)
 	
 	warehouse.update(should_move)
+	print(robot1.state)
 	
 	screen.fill((0, 0, 0))
 	warehouse.render(screen, shelf_img, robot_img, grid_size)

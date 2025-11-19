@@ -7,23 +7,9 @@ font = pygame.font.SysFont("Arial", 30)
 text_surfaces = {}
 
 new_items = [
-    "toothpaste",
-    "toothbrush",
-    "cologne",
-    "airpods",
-    "iphone",
-    "watch",
-    "laptop",
-    "dell laptop",
-    "candy",
-    "discord",
-    "phone",
-    "toilet paper",
-    "paper",
-    "pencil",
-    "pen",
-    "notebook",
-    "face",
+    "Gadget",
+    "Widget",
+    "Sprocket"
 ]
 
 for item in new_items:
