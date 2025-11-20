@@ -53,10 +53,12 @@ class Warehouse:
             shelf_pos = (pos[1] * grid_size, pos[0] * grid_size)
             screen.blit(shelf_img, shelf_pos)
 
+            item_text_dy = 0
             for item, q in shelf.items.items():
                 if (item, q) not in text_surfaces:
                     text_surfaces[(item, q)] = font.render( f"{item}: {q}", True, item_colors[item])
-                screen.blit(text_surfaces[(item, q)], shelf_pos)
+                screen.blit(text_surfaces[(item, q)], (shelf_pos[0], shelf_pos[1] + item_text_dy))
+                item_text_dy += 30
 
         for robot in self.robots:
             screen.blit(
