@@ -46,8 +46,6 @@ while True:
     if should_move:
         frames = 0
 
-    add_items_timer += 1
-
     brain.update()
 
     warehouse.update(should_move)
