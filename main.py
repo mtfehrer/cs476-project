@@ -1,15 +1,13 @@
 import pygame
 import sys
 from warehouse import Warehouse
-from task import Task
 from importer import Importer
-from utils import *
+from brain import Brain
 
 screen_size = (1200, 900)
 screen = pygame.display.set_mode(screen_size)
 clock = pygame.time.Clock()
 framerate = 144
-items_timer = 500
 
 robot_img = pygame.image.load("robot.png").convert_alpha()
 robot_img = pygame.transform.scale(robot_img, (150, 200))
@@ -31,38 +29,30 @@ map_layout = [
 warehouse = Warehouse(map_layout)
 
 robot1 = warehouse.add_robot((1, 0))
+robot2 = warehouse.add_robot((3, 4))
+robot3 = warehouse.add_robot((1, 4))
 
-task_queue = []
+brain = Brain(warehouse, warehouse_importer)
 
 frames = 0
-add_items_timer = 0
 while True:
-	for event in pygame.event.get():
-		if event.type == pygame.QUIT:
-			pygame.quit()
-			sys.exit()
-	
-	frames += 1
-	should_move = (frames >= framerate)
-	if should_move:
-		frames = 0
-	
-	add_items_timer += 1
-	
-	should_add_item = (add_items_timer >= items_timer)
-	if should_add_item:
-		random_shelf = warehouse.get_random_shelf()
-		item, amount = warehouse_importer.add_random_item(random_shelf)
-		task_queue = task_queue + get_tasks_for_item_sort(warehouse, item, amount, random_shelf.position)
-		add_items_timer = 0
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
 
-	if robot1.state == "idle" and task_queue:
-		cur_task = task_queue.pop(0)
-		robot1.execute_order(cur_task)
+    frames += 1
+    should_move = (frames >= framerate)
+    if should_move:
+        frames = 0
 
-	warehouse.update(should_move)
-	
-	screen.fill((0, 0, 0))
-	warehouse.render(screen, shelf_img, robot_img, grid_size)
-	pygame.display.update()
-	clock.tick(framerate)
+    add_items_timer += 1
+
+    brain.update()
+
+    warehouse.update(should_move)
+
+    screen.fill((0, 0, 0))
+    warehouse.render(screen, shelf_img, robot_img, grid_size)
+    pygame.display.update()
+    clock.tick(framerate)

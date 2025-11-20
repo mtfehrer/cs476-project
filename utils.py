@@ -6,7 +6,7 @@ def get_tasks_for_item_sort(warehouse, item, amount, pos):
     tasks = []
     if item_locations[item] != pos:
         tasks.append(Task(warehouse.shelves[pos], item, amount, is_pickup=True))
-        tasks.append(Task(warehouse.shelves[item_locations[item]], item, 3, is_pickup=False))
+        tasks.append(Task(warehouse.shelves[item_locations[item]], item, amount, is_pickup=False))
     return tasks
 
 
