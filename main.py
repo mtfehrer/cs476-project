@@ -2,12 +2,14 @@ import pygame
 import sys
 from warehouse import Warehouse
 from importer import Importer
-from brain import Brain
+from utils import item_locations
 
 screen_size = (1200, 900)
 screen = pygame.display.set_mode(screen_size)
 clock = pygame.time.Clock()
 framerate = 144
+
+should_move_count = 100
 
 robot_img = pygame.image.load("robot.png").convert_alpha()
 robot_img = pygame.transform.scale(robot_img, (150, 200))
@@ -26,13 +28,11 @@ map_layout = [
 	[1, 0, 1, 0, 1]
 ]
 
-warehouse = Warehouse(map_layout)
+warehouse = Warehouse(map_layout, list(item_locations.keys()))
 
 robot1 = warehouse.add_robot((1, 0))
 robot2 = warehouse.add_robot((3, 4))
 robot3 = warehouse.add_robot((1, 4))
-
-brain = Brain(warehouse, warehouse_importer)
 
 frames = 0
 while True:
@@ -42,11 +42,9 @@ while True:
             sys.exit()
 
     frames += 1
-    should_move = (frames >= framerate)
+    should_move = (frames >= should_move_count)
     if should_move:
         frames = 0
-
-    brain.update()
 
     warehouse.update(should_move)
 
