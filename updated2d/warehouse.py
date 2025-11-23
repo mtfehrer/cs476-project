@@ -1,4 +1,4 @@
-from collections import deque, Counter
+from collections import deque
 from typing import List, Dict, Tuple, Optional, Set
 
 from shelf import Shelf
@@ -146,8 +146,13 @@ class Warehouse:
 	def _find_shelf_with_item(self, item_name: str) -> Optional[Shelf]:
 		home_position = self.item_home_locations.get(item_name)
 		if home_position and home_position in self.shelves:
-			return self.shelves[home_position]
-		return next((shelf for shelf in self.shelves.values() if shelf.get_quantity(item_name) > 0), None)
+			home_shelf = self.shelves[home_position]
+			if home_shelf.get_quantity(item_name) > 0:
+				return home_shelf
+		for shelf in self.shelves.values():
+			if shelf.get_quantity(item_name) > 0:
+				return shelf
+		return None
 
 	def _normalize_order_items(self, order_items) -> List[Tuple[str, int]]:
 		if isinstance(order_items, tuple):
@@ -175,9 +180,16 @@ class Warehouse:
 		for item_name, quantity in normalized_items:
 			source_shelf = self._find_shelf_with_item(item_name)
 			if not source_shelf:
+				print(f"Item {item_name} unavailable for order")
 				continue
-			prepared_lines.append((item_name, quantity, source_shelf))
+			available = source_shelf.get_quantity(item_name)
+			actual_quantity = min(quantity, available)
+			if actual_quantity <= 0:
+				print(f"Item {item_name} out of stock")
+				continue
+			prepared_lines.append((item_name, actual_quantity, source_shelf))
 		if not prepared_lines:
+			print("Order could not be queued; no items available")
 			return False
 		order_id = self.next_order_id
 		self.next_order_id += 1
@@ -265,9 +277,14 @@ class Warehouse:
 			self._assign_task_to_robot(robot)
 
 	def _assign_task_to_robot(self, robot: MainRobot) -> None:
-		queue = self.sort_task_queue or self.order_task_queue
-		if queue:
-			robot.execute_order(queue.popleft())
+		if not robot.is_available():
+			return
+		if robot.role == "sorter" and self.sort_task_queue:
+			task = self.sort_task_queue.popleft()
+			robot.execute_order(task)
+		elif robot.role == "picker" and self.order_task_queue:
+			task = self.order_task_queue.popleft()
+			robot.execute_order(task)
 	
 	def get_adjacent_path_position(self, target: Tuple[int, int]) -> Optional[Tuple[int, int]]:
 		rows, cols = len(self.map_), len(self.map_[0])
@@ -313,55 +330,7 @@ class Warehouse:
 	def _compute_move_permissions(self, should_move: bool) -> Dict[int, bool]:
 		if not should_move:
 			return {}
-		desired_moves: Dict[int, Tuple[int, int]] = {}
-		for robot in self.robots:
-			step = robot.peek_next_step()
-			if step:
-				desired_moves[robot.robot_id] = step
-		if not desired_moves:
-			return {}
-
-		target_counts = Counter(desired_moves.values())
-		position_lookup = {robot.position: robot.robot_id for robot in self.robots}
-		permissions: Dict[int, bool] = {}
-		debug_msgs = []
-		for robot in self.robots:
-			step = desired_moves.get(robot.robot_id)
-			if step is None:
-				continue
-
-			can_move = True
-
-			if target_counts[step] > 1:
-				priority_robot = min(rid for rid, pos in desired_moves.items() if pos == step)
-				if robot.robot_id != priority_robot:
-					can_move = False
-					debug_msgs.append(f"Robot {robot.robot_id} yields to {priority_robot} to avoid clash at {step}")
-
-			occupant_id = position_lookup.get(step)
-			if occupant_id is not None and occupant_id != robot.robot_id:
-				occupant_target = desired_moves.get(occupant_id)
-				occupant_leaving = occupant_target is not None and occupant_target != step
-				if occupant_target == robot.position:
-					# allow only one robot in a head-on swap; lower id wins the tie
-					can_move = robot.robot_id < occupant_id
-					if can_move:
-						debug_msgs.append(f"Robot {robot.robot_id} proceeds in swap with {occupant_id} toward {step}")
-					else:
-						debug_msgs.append(f"Robot {robot.robot_id} pauses to avoid swap with {occupant_id} at {step}")
-				elif not occupant_leaving:
-					can_move = False
-					debug_msgs.append(f"Robot {robot.robot_id} waits; {occupant_id} occupies {step}")
-
-			permissions[robot.robot_id] = can_move
-		if debug_msgs:
-			seen = set()
-			for msg in debug_msgs:
-				if msg in seen:
-					continue
-				seen.add(msg)
-				print(msg)
-		return permissions
+		return {robot.robot_id: True for robot in self.robots}
 	
 	def render(self, screen, shelf_img, robot_img, grid_size):
 		for pos, shelf in self.shelves.items():

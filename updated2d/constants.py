@@ -20,11 +20,31 @@ ROBOT_IMAGE_PATH = "robot.png"
 SHELF_IMAGE_PATH = "shelf.png"
 
 
-MAP_LAYOUT = [
-	[1, 1, 1],
-	[1, 1, 1],
-	[1, 1, 1],
-]
+def _build_storage_map(shelf_rows: int, shelf_cols: int):
+	rows = shelf_rows * 2 + 1
+	cols = shelf_cols * 2 + 1
+	layout = []
+	for r in range(rows):
+		row = []
+		for c in range(cols):
+			if r % 2 == 1 and c % 2 == 1:
+				row.append(1)
+			else:
+				row.append(0)
+		layout.append(row)
+	return layout
+
+
+def _add_side_buffer_columns(layout):
+	padded = []
+	for row in layout:
+		# keep outer wall columns, insert a buffer aisle between sources/orders and storage
+		padded.append([row[0], 0, *row[1:-1], 0, row[-1]])
+	return padded
+
+
+MAP_LAYOUT = _build_storage_map(3, 3)
+MAP_LAYOUT = _add_side_buffer_columns(MAP_LAYOUT)
 GRID_SIZE = min(
 	BASE_GRID_SIZE,
 	MAX_SCREEN_WIDTH // len(MAP_LAYOUT[0]),
@@ -113,7 +133,7 @@ INITIAL_STOCK = {
 
 ROBOT_CONFIG = [
 	{"role": "sorter", "position": (middle_row, 1), "name": "Sorter-1"},
-	{"role": "picker", "position": (0, 1), "name": "Picker-1"},
+	{"role": "picker", "position": (middle_row, len(MAP_LAYOUT[0]) - 4), "name": "Picker-1"},
 ]
 
 USER_ORDER_KEY_BINDINGS = {
