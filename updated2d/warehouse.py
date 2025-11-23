@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, Counter
 from typing import List, Dict, Tuple, Optional, Set
 
 from shelf import Shelf
@@ -24,6 +24,7 @@ class Warehouse:
 		self.receiving_station_positions: Set[Tuple[int, int]] = set()
 		self.receiving_transfer_tasks: Dict[Tuple[Tuple[int, int], str], Task] = {}
 		self.order_shipping_assignments: Dict[int, Shelf] = {}
+		self.order_pickup_unlocked = True
 		if shipping_station_positions:
 			for position in shipping_station_positions:
 				station = Shelf(position)
@@ -40,19 +41,19 @@ class Warehouse:
 				if self.map_[i][j] == 1:
 					self.shelves[(i, j)] = Shelf((i, j))
 	
-	def add_robot(self, position: Tuple[int, int], role: str = "sorter") -> MainRobot:
+	def add_robot(self, position: Tuple[int, int], role: str = "sorter", name: Optional[str] = None) -> MainRobot:
 		robot_id = len(self.robots)
-		robot = self._create_robot_instance(position, robot_id, role)
+		robot = self._create_robot_instance(position, robot_id, role, name)
 		self.robots.append(robot)
 		self._assign_task_to_robot(robot)
 		return robot
 
-	def _create_robot_instance(self, position: Tuple[int, int], robot_id: int, role: str) -> MainRobot:
+	def _create_robot_instance(self, position: Tuple[int, int], robot_id: int, role: str, name: Optional[str]) -> MainRobot:
 		if role == "sorter":
-			return SorterRobot(position, robot_id, self)
+			return SorterRobot(position, robot_id, self, name=name)
 		if role in ("picker", "order"):
-			return OrderRobot(position, robot_id, self)
-		return MainRobot(position, robot_id, role, self)
+			return OrderRobot(position, robot_id, self, name=name)
+		return MainRobot(position, robot_id, role, self, name=name)
 
 	def stock_shelf(self, position: Tuple[int, int], item_name: str, quantity: int) -> None:
 		shelf = self.shelves.get(position)
@@ -145,13 +146,8 @@ class Warehouse:
 	def _find_shelf_with_item(self, item_name: str) -> Optional[Shelf]:
 		home_position = self.item_home_locations.get(item_name)
 		if home_position and home_position in self.shelves:
-			home_shelf = self.shelves[home_position]
-			if home_shelf.get_quantity(item_name) > 0:
-				return home_shelf
-		for shelf in self.shelves.values():
-			if shelf.get_quantity(item_name) > 0:
-				return shelf
-		return None
+			return self.shelves[home_position]
+		return next((shelf for shelf in self.shelves.values() if shelf.get_quantity(item_name) > 0), None)
 
 	def _normalize_order_items(self, order_items) -> List[Tuple[str, int]]:
 		if isinstance(order_items, tuple):
@@ -166,36 +162,30 @@ class Warehouse:
 			normalized.append((item_name, quantity))
 		return normalized
 
-	def create_user_order(self, order_items) -> None:
+	def create_user_order(self, order_items) -> bool:
 		normalized_items = self._normalize_order_items(order_items)
 		if not normalized_items:
 			print("Invalid order request")
-			return
+			return False
 		shipping_station = self._select_station(self.shipping_stations)
 		if not shipping_station:
 			print("No shipping station configured")
-			return
+			return False
 		prepared_lines: List[Tuple[str, int, Shelf]] = []
 		for item_name, quantity in normalized_items:
 			source_shelf = self._find_shelf_with_item(item_name)
 			if not source_shelf:
-				print(f"Item {item_name} unavailable for order")
 				continue
-			available = source_shelf.get_quantity(item_name)
-			actual_quantity = min(quantity, available)
-			if actual_quantity <= 0:
-				print(f"Item {item_name} out of stock")
-				continue
-			prepared_lines.append((item_name, actual_quantity, source_shelf))
+			prepared_lines.append((item_name, quantity, source_shelf))
 		if not prepared_lines:
-			print("Order could not be queued; no items available")
-			return
+			return False
 		order_id = self.next_order_id
 		self.next_order_id += 1
 		order = Order(order_id, [(item, quantity) for item, quantity, _ in prepared_lines])
 		self.orders[order_id] = order
 		print(f"Queued order #{order_id} for {order.describe()}")
 		self._queue_order_tasks(order_id, prepared_lines, shipping_station)
+		return True
 
 	def _queue_order_tasks(self, order_id: int, prepared_lines: List[Tuple[str, int, Shelf]], shipping_station: Shelf) -> None:
 		self.order_shipping_assignments[order_id] = shipping_station
@@ -222,6 +212,33 @@ class Warehouse:
 					shipping_shelf.remove_item(line_item, to_remove)
 			print(f"Order #{order_id} packed and cleared from order shelf")
 			del self.orders[order_id]
+	
+	def _has_open_order_for_item(self, item_name: str) -> bool:
+		for order in self.orders.values():
+			if order.remaining.get(item_name, 0) > 0:
+				return True
+		return False
+	
+	def unlock_order_pickup(self) -> None:
+		if self.order_pickup_unlocked:
+			return
+		self.order_pickup_unlocked = True
+		print("Order pickup unlocked; dispatching picker tasks")
+		self._assign_tasks()
+
+	def handle_sort_dropoff(self, shelf: Shelf, item_name: str, quantity: int) -> None:
+		if quantity <= 0:
+			return
+		if self._has_open_order_for_item(item_name):
+			return
+		shipping_station = self._select_station(self.shipping_stations)
+		if not shipping_station:
+			return
+		available = shelf.get_quantity(item_name)
+		if available <= 0:
+			return
+		request_qty = min(quantity, available)
+		self.create_user_order([(item_name, request_qty)])
 
 	def handle_sort_pickup_complete(self, task: Task) -> None:
 		if task.task_kind != "sort":
@@ -236,19 +253,43 @@ class Warehouse:
 	def notify_robot_idle(self, robot: MainRobot) -> None:
 		self._assign_task_to_robot(robot)
 
+	def is_walkable(self, row: int, col: int) -> bool:
+		return (
+			0 <= row < len(self.map_)
+			and 0 <= col < len(self.map_[0])
+			and self.map_[row][col] == 0
+		)
+
 	def _assign_tasks(self) -> None:
 		for robot in self.robots:
 			self._assign_task_to_robot(robot)
 
 	def _assign_task_to_robot(self, robot: MainRobot) -> None:
-		if not robot.is_available():
-			return
-		if robot.role == "sorter" and self.sort_task_queue:
-			task = self.sort_task_queue.popleft()
-			robot.execute_order(task)
-		elif robot.role == "picker" and self.order_task_queue:
-			task = self.order_task_queue.popleft()
-			robot.execute_order(task)
+		queue = self.sort_task_queue or self.order_task_queue
+		if queue:
+			robot.execute_order(queue.popleft())
+	
+	def get_adjacent_path_position(self, target: Tuple[int, int]) -> Optional[Tuple[int, int]]:
+		rows, cols = len(self.map_), len(self.map_[0])
+		r, c = target
+		if 0 <= r < rows and 0 <= c < cols and self.map_[r][c] == 0:
+			return target
+		visited = set()
+		queue = deque([((r, c), 0)])
+		while queue:
+			(pos_r, pos_c), dist = queue.popleft()
+			for dr, dc in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+				nr, nc = pos_r + dr, pos_c + dc
+				if not (0 <= nr < rows and 0 <= nc < cols):
+					continue
+				if (nr, nc) in visited:
+					continue
+				visited.add((nr, nc))
+				if self.map_[nr][nc] == 0:
+					return (nr, nc)
+				if dist < 2:
+					queue.append(((nr, nc), dist + 1))
+		return None
 	
 	def is_position_occupied(self, row: int, col: int, exclude_robot: int = -1) -> bool:
 		for robot in self.robots:
@@ -264,9 +305,63 @@ class Warehouse:
 		return False
 	
 	def update(self, should_move: bool):
+		move_permissions = self._compute_move_permissions(should_move)
 		for robot in self.robots:
-			robot.update(should_move)
+			robot.update(should_move, can_move=move_permissions.get(robot.robot_id, True))
 		self._assign_tasks()
+	
+	def _compute_move_permissions(self, should_move: bool) -> Dict[int, bool]:
+		if not should_move:
+			return {}
+		desired_moves: Dict[int, Tuple[int, int]] = {}
+		for robot in self.robots:
+			step = robot.peek_next_step()
+			if step:
+				desired_moves[robot.robot_id] = step
+		if not desired_moves:
+			return {}
+
+		target_counts = Counter(desired_moves.values())
+		position_lookup = {robot.position: robot.robot_id for robot in self.robots}
+		permissions: Dict[int, bool] = {}
+		debug_msgs = []
+		for robot in self.robots:
+			step = desired_moves.get(robot.robot_id)
+			if step is None:
+				continue
+
+			can_move = True
+
+			if target_counts[step] > 1:
+				priority_robot = min(rid for rid, pos in desired_moves.items() if pos == step)
+				if robot.robot_id != priority_robot:
+					can_move = False
+					debug_msgs.append(f"Robot {robot.robot_id} yields to {priority_robot} to avoid clash at {step}")
+
+			occupant_id = position_lookup.get(step)
+			if occupant_id is not None and occupant_id != robot.robot_id:
+				occupant_target = desired_moves.get(occupant_id)
+				occupant_leaving = occupant_target is not None and occupant_target != step
+				if occupant_target == robot.position:
+					# allow only one robot in a head-on swap; lower id wins the tie
+					can_move = robot.robot_id < occupant_id
+					if can_move:
+						debug_msgs.append(f"Robot {robot.robot_id} proceeds in swap with {occupant_id} toward {step}")
+					else:
+						debug_msgs.append(f"Robot {robot.robot_id} pauses to avoid swap with {occupant_id} at {step}")
+				elif not occupant_leaving:
+					can_move = False
+					debug_msgs.append(f"Robot {robot.robot_id} waits; {occupant_id} occupies {step}")
+
+			permissions[robot.robot_id] = can_move
+		if debug_msgs:
+			seen = set()
+			for msg in debug_msgs:
+				if msg in seen:
+					continue
+				seen.add(msg)
+				print(msg)
+		return permissions
 	
 	def render(self, screen, shelf_img, robot_img, grid_size):
 		for pos, shelf in self.shelves.items():
@@ -285,7 +380,11 @@ class Warehouse:
 			self._render_station_column(screen, shelf_img, grid_size, self.shipping_stations, "Orders", (255, 215, 0))
 
 		for robot in self.robots:
-			screen.blit(robot_img, (robot.position[1] * grid_size, robot.position[0] * grid_size))
+			robot_pos = (robot.position[1] * grid_size, robot.position[0] * grid_size)
+			screen.blit(robot_img, robot_pos)
+			label = font.render(robot.name, True, (255, 255, 255))
+			label_rect = label.get_rect(center=(robot_pos[0] + robot_img.get_width() // 2, robot_pos[1] - 5))
+			screen.blit(label, label_rect)
 
 	def get_random_shelf(self) -> Shelf:
 		shelves_list = list(self.shelves.values())

@@ -1,5 +1,7 @@
 import pygame 
 import sys
+import random
+from collections import deque
 
 from importer import Importer
 from warehouse import Warehouse
@@ -20,6 +22,9 @@ from constants import (
 	RECEIVING_STATION_POSITIONS,
 	USER_ORDER_KEY_BINDINGS,
 	SAMPLE_ORDERS,
+	STARTER_SORT_ITEMS,
+	STARTER_SHIPMENT_QUANTITY,
+	DEMO_ORDERS,
 )
 
 screen = pygame.display.set_mode(SCREEN_SIZE)
@@ -42,13 +47,26 @@ for position, inventory in INITIAL_STOCK.items():
 	for item_name, quantity in inventory.items():
 		warehouse.stock_shelf(position, item_name, quantity)
 
+starter_items = list(STARTER_SORT_ITEMS)
+random.shuffle(starter_items)
+for item_name in starter_items:
+	warehouse.receive_incoming_shipment(item_name, STARTER_SHIPMENT_QUANTITY)
+
 for robot_config in ROBOT_CONFIG:
-	warehouse.add_robot(robot_config["position"], role=robot_config["role"])
+	warehouse.add_robot(robot_config["position"], role=robot_config["role"], name=robot_config.get("name"))
+
+for idx, demo_order in enumerate(DEMO_ORDERS, start=1):
+	description = ", ".join(f"{quantity}x {item}" for item, quantity in demo_order)
+	print(f"Queuing demo order {idx}: {description}")
+	warehouse.create_user_order(demo_order)
+
+pending_sample_orders = deque(SAMPLE_ORDERS)
+SAMPLE_ORDER_ATTEMPT_INTERVAL = max(1, FRAMERATE // 2)
+sample_order_timer = SAMPLE_ORDER_ATTEMPT_INTERVAL
 
 for idx, sample_order in enumerate(SAMPLE_ORDERS, start=1):
 	description = ", ".join(f"{quantity}x {item}" for item, quantity in sample_order)
-	print(f"Auto-queuing sample order {idx}: {description}")
-	warehouse.create_user_order(sample_order)
+	print(f"Preparing sample order {idx}: {description}")
 
 for key, order in USER_ORDER_KEY_BINDINGS.items():
 	key_name = pygame.key.name(key)
@@ -79,6 +97,13 @@ while True:
 		warehouse_importer.add_random_item()
 		add_items_timer = 0
 	
+	sample_order_timer += 1
+	if pending_sample_orders and sample_order_timer >= SAMPLE_ORDER_ATTEMPT_INTERVAL:
+		sample_order_timer = 0
+		next_sample_order = pending_sample_orders[0]
+		queued = warehouse.create_user_order(next_sample_order)
+		if queued:
+			pending_sample_orders.popleft()
 	
 	warehouse.update(should_move)
 	

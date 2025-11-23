@@ -8,6 +8,8 @@ ITEMS_TIMER = 500
 BASE_GRID_SIZE = 175
 MAX_SCREEN_WIDTH = 1400
 MAX_SCREEN_HEIGHT = 900
+ORDER_PICKUP_DELAY_SECONDS = 180
+STARTER_SHIPMENT_QUANTITY = 6
 IMPORTER_MIN_SHIPMENTS = 1
 IMPORTER_MAX_SHIPMENTS = 3
 IMPORTER_MIN_UNITS = 1
@@ -18,22 +20,11 @@ ROBOT_IMAGE_PATH = "robot.png"
 SHELF_IMAGE_PATH = "shelf.png"
 
 
-def _build_storage_map(shelf_rows: int, shelf_cols: int):
-	rows = shelf_rows * 2 + 1
-	cols = shelf_cols * 2 + 1
-	layout = []
-	for r in range(rows):
-		row = []
-		for c in range(cols):
-			if r % 2 == 1 and c % 2 == 1:
-				row.append(1)
-			else:
-				row.append(0)
-		layout.append(row)
-	return layout
-
-
-MAP_LAYOUT = _build_storage_map(5, 5)
+MAP_LAYOUT = [
+	[1, 1, 1],
+	[1, 1, 1],
+	[1, 1, 1],
+]
 GRID_SIZE = min(
 	BASE_GRID_SIZE,
 	MAX_SCREEN_WIDTH // len(MAP_LAYOUT[0]),
@@ -93,30 +84,56 @@ for item in new_items:
 		random.randint(0, 255),
 		random.randint(0, 255),
 	)
+STARTER_SORT_ITEMS = [
+	"laptop",
+	"airpods",
+	"toothpaste",
+	"notebook",
+	"discord",
+	"pen",
+	"cologne",
+]
 
 ITEM_HOME_LOCATIONS = {}
 for idx, item in enumerate(item_colors.keys()):
 	ITEM_HOME_LOCATIONS[item] = SHELF_POSITIONS[idx % len(SHELF_POSITIONS)]
 
 INITIAL_STOCK = {
-	ITEM_HOME_LOCATIONS["Widget"]: {"Widget": 40},
-	ITEM_HOME_LOCATIONS["Gadget"]: {"Gadget": 35},
-	ITEM_HOME_LOCATIONS["Sprocket"]: {"Sprocket": 30},
+	ITEM_HOME_LOCATIONS["Widget"]: {"Widget": 70},
+	ITEM_HOME_LOCATIONS["Gadget"]: {"Gadget": 60},
+	ITEM_HOME_LOCATIONS["Sprocket"]: {"Sprocket": 55},
+	ITEM_HOME_LOCATIONS["laptop"]: {"laptop": 10},
+	ITEM_HOME_LOCATIONS["airpods"]: {"airpods": 9},
+	ITEM_HOME_LOCATIONS["toothpaste"]: {"toothpaste": 11},
+	ITEM_HOME_LOCATIONS["notebook"]: {"notebook": 9},
+	ITEM_HOME_LOCATIONS["discord"]: {"discord": 8},
+	ITEM_HOME_LOCATIONS["pen"]: {"pen": 10},
+	ITEM_HOME_LOCATIONS["cologne"]: {"cologne": 7},
 }
 
 ROBOT_CONFIG = [
-	{"role": "sorter", "position": (middle_row, 2)},
-	{"role": "picker", "position": (middle_row, len(MAP_LAYOUT[0]) - 3)},
+	{"role": "sorter", "position": (middle_row, 1), "name": "Sorter-1"},
+	{"role": "picker", "position": (0, 1), "name": "Picker-1"},
 ]
 
 USER_ORDER_KEY_BINDINGS = {
-	pygame.K_1: [("Widget", 5)],
-	pygame.K_2: [("Gadget", 3), ("Widget", 2)],
-	pygame.K_3: [("Sprocket", 2), ("Gadget", 1), ("Widget", 1)],
+	pygame.K_1: [("Widget", 12)],
+	pygame.K_2: [("Gadget", 8), ("Widget", 6)],
+	pygame.K_3: [("Sprocket", 6), ("Gadget", 4), ("Widget", 5)],
 }
 
 SAMPLE_ORDERS = [
-	[("Widget", 2), ("Gadget", 1)],
-	[("Sprocket", 3), ("Widget", 1)],
-	[("Gadget", 2), ("Sprocket", 2)],
+	[("laptop", 18), ("airpods", 14)],
+	[("toothpaste", 22), ("notebook", 18)],
+	[("discord", 14), ("pen", 12), ("cologne", 10)],
+]
+
+# Orders queued immediately at startup to demonstrate picker traffic.
+DEMO_ORDERS = [
+	[("Widget", 12), ("Gadget", 10)],
+	[("Sprocket", 14), ("Widget", 8)],
+	[("laptop", 6), ("toothpaste", 6)],
+	[("pen", 8), ("discord", 6)],
+	[("airpods", 8), ("cologne", 5)],
+	[("notebook", 8), ("Widget", 6), ("Gadget", 4)],
 ]
